@@ -1,0 +1,10 @@
+# Gebaute Programme und Zwischenstände
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+build/
+# Screenshots aus den Test-Schaltern
+*.png
