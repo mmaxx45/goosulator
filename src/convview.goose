@@ -347,7 +347,7 @@ fn value_line(ctx: ui::Context, i: i64, w: f32) {
         format(t, fx::symbol(units[idx].code), " ");
     }
     if i == active { nf::de_text(t, entry); } else { show(t, other_value()); }
-    let font = if i == active { th::f_disp[1] } else { th::f_disp[1] };
+    let font = th::fit_font_h(t, w - 24.0, 34.0);
     if kit::value_field(ctx, t, font, i == active, 56.0) { activate(i); }
 }
 

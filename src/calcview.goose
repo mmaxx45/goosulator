@@ -23,8 +23,7 @@ var func_open = false;
 var hist_scroll = ui::Scroll { 0, 0 };
 
 fn k(ctx: ui::Context, label: const u8[:], kind: i64, enabled: bool = true) -> bool {
-    let big = label == "÷" || label == "×" || label == "−" || label == "+" || label == "=";
-    let font = if kind == th::K_NUM { th::f_num } else if big { th::f_op } else { th::f_key };
+    let font = if kind == th::K_NUM { th::f_digit } else { th::f_key };
     th::key(ctx, label, kind, font, enabled)
 }
 
@@ -32,26 +31,27 @@ fn ok() -> bool { !calc::is_error() }
 
 // --- Kopf: Rechenweg und Anzeige -------------------------------------------------------
 
-fn display(ctx: ui::Context, w: f32) {
+fn display(ctx: ui::Context, w: f32, eh: f32, rh: f32) {
     var e: u8[>..] = [];
     calc::expr_text(e);
-    ui::layout_row_dynamic(ctx, 24.0, 1);
+    ui::layout_row_dynamic(ctx, eh, 1);
     let st, r = ui::widget(ctx);
     if st != ui::WIDGET_INVALID {
-        kit::text_right(ctx, ui::rect(r.x + 8.0, r.y, r.w - 16.0, r.h), e, th::f_expr, th::pal.text_dim);
+        kit::text_right(ctx, ui::rect(r.x + 12.0, r.y, r.w - 26.0, r.h), e, th::f_expr, th::pal.text_dim);
     }
     var d: u8[>..] = [];
     calc::display_text(d);
-    ui::layout_row_dynamic(ctx, 66.0, 1);
+    ui::layout_row_dynamic(ctx, rh, 1);
     let st2, r2 = ui::widget(ctx);
     if st2 != ui::WIDGET_INVALID {
-        let font = th::fit_font(d, r2.w - 16.0);
-        kit::text_right(ctx, ui::rect(r2.x + 8.0, r2.y, r2.w - 16.0, r2.h), d, font, th::pal.text);
+        let font = th::fit_font_h(d, r2.w - 26.0, rh * 0.64);
+        kit::text_right(ctx, ui::rect(r2.x + 12.0, r2.y, r2.w - 26.0, r2.h), d, font, th::pal.text);
     }
 }
 
-fn memory_row(ctx: ui::Context, narrow: bool) {
-    ui::layout_row_dynamic(ctx, 30.0, if narrow { 6 } else { 5 });
+fn memory_row(ctx: ui::Context, narrow: bool, mh: f32) {
+    // Sechs Spalten zu höchstens 80 px, wie MemoryPanel in Calculator.xaml.
+    ui::layout_row_dynamic(ctx, mh, if narrow { 6 } else { 5 });
     let has = calc::memory.len > 0 && ok();
     if th::key(ctx, "MC", th::K_FLAT, th::f_small, has) { calc::mem_clear(); }
     if th::key(ctx, "MR", th::K_FLAT, th::f_small, has) { calc::mem_recall(); }
@@ -163,7 +163,7 @@ fn standard_keys(ctx: ui::Context, h: f32) {
     if k(ctx, "%", th::K_OP, ok()) { calc::percent(); }
     if k(ctx, "CE", th::K_OP) { calc::clear_entry(); }
     if k(ctx, "C", th::K_OP) { calc::clear_all(); }
-    if th::icon_key(ctx, 0xE750, th::K_OP) { calc::backspace(); }
+    if k(ctx, "⌫", th::K_OP) { calc::backspace(); }
     ui::layout_row_dynamic(ctx, rh, 4);
     if k(ctx, "¹/ₓ", th::K_OP, ok()) { calc::unary("1/"); }
     if k(ctx, "x²", th::K_OP, ok()) { calc::unary("sqr"); }
@@ -190,8 +190,8 @@ fn angle_name() -> const u8[:] {
 }
 
 // Die Zeile über den Tasten: DEG, F-E; darunter Trigonometrie und Funktion.
-fn sci_bars(ctx: ui::Context, narrow: bool) {
-    ui::layout_row_begin(ctx, ui::STATIC, 30.0, 2);
+fn sci_bars(ctx: ui::Context, narrow: bool, ch: f32, mh: f32) {
+    ui::layout_row_begin(ctx, ui::STATIC, ch, 2);
     ui::layout_row_push(ctx, 56.0);
     if th::key(ctx, angle_name(), th::K_FLAT, th::f_small) { calc::angle = (calc::angle + 1) % 3; }
     ui::layout_row_push(ctx, 56.0);
@@ -199,7 +199,7 @@ fn sci_bars(ctx: ui::Context, narrow: bool) {
         calc::fe = !calc::fe;
     }
     ui::layout_row_end(ctx);
-    memory_row(ctx, narrow);
+    memory_row(ctx, narrow, mh);
     ui::layout_row_begin(ctx, ui::STATIC, 34.0, 2);
     ui::layout_row_push(ctx, 140.0);
     let tb = ui::widget_bounds(ctx);
@@ -274,7 +274,7 @@ fn sci_keys(ctx: ui::Context, h: f32) {
     if k(ctx, clear_label, th::K_OP) {
         if clear_label == "CE" { calc::clear_entry(); } else { calc::clear_all(); }
     }
-    if th::icon_key(ctx, 0xE750, th::K_OP) { calc::backspace(); }
+    if k(ctx, "⌫", th::K_OP) { calc::backspace(); }
 
     ui::layout_row_dynamic(ctx, rh, 5);
     if second {
@@ -338,13 +338,17 @@ fn sci_keys(ctx: ui::Context, h: f32) {
 }
 
 // Alles unterhalb der Kopfzeile. used: was die Kopfzeile schon belegt.
+// Zeilenhöhen wie in Calculator.xaml: unter der 48 px hohen Kopfzeile teilen
+// sich Rechenweg, Ergebnis, (DEG/F-E,) Speicherleiste und Tasten den Rest
+// im Verhältnis 22 : 72 : (32 :) 32 : 308 bzw. 276.
 fn draw(ctx: ui::Context, w: f32, h: f32, used: f32, narrow: bool, scientific: bool) {
     calc::sci = scientific;
-    display(ctx, w);
+    let unit = (h - used - 3.0) / 434.0;
+    display(ctx, w, 22.0 * unit - 2.0, 72.0 * unit - 2.0);
     if scientific {
-        sci_bars(ctx, narrow);
+        sci_bars(ctx, narrow, 32.0 * unit - 2.0, 32.0 * unit - 2.0);
     } else {
-        memory_row(ctx, narrow);
+        memory_row(ctx, narrow, 32.0 * unit - 2.0);
     }
     let rest = kit::remaining(ctx, h);
     if narrow && flyout != 0 {

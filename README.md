@@ -17,6 +17,8 @@ goose test_calc.goose        # Tests der Rechenlogik
 
 **Wechselkurse** kommen von frankfurter.dev (Referenzkurse der EZB) über `urlmon.dll`, also ohne C-Code. Sie werden unter `%LOCALAPPDATA%\Goosulator\kurse.json` zwischengespeichert und stehen damit auch offline zur Verfügung.
 
+**Design:** Farben (Transparenzen über Mica), Raster, Schriftgrößen und Symbole stammen aus dem Quellcode des Windows-Rechners ([microsoft/calculator](https://github.com/microsoft/calculator), MIT). `data/CalculatorIcons.ttf` ist dessen Symbolschrift, siehe `data/LICENSE-CalculatorIcons.txt`. Akzentfarbe und hell/dunkel kommen wie beim Original aus den Windows-Einstellungen.
+
 **Schriften:** Segoe UI, Segoe UI Symbol und Segoe Fluent Icons werden zur Laufzeit aus `C:\Windows\Fonts` geladen.
 
 Aufbau: `src/calc.goose` (Standard/Wissenschaftlich, Shunting-Yard), `src/progview.goose`, `src/dateview.goose`, `src/convview.goose`, `src/fx.goose` (Kurse), `src/theme.goose` (Farben, Schriften, Tasten), `src/kit.goose` (eigene Widgets), `src/numfmt.goose` (deutsches Zahlenformat).

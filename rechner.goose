@@ -45,11 +45,11 @@ let MODE_NAMES: const u8[:][18] = [
     "Einstellungen",
 ];
 
-// Segoe Fluent Icons
+// Die Symbole aus NavCategory.cs, in der Schrift des Windows-Rechners.
 let MODE_ICONS: u32[18] = [
-    0xE8EF, 0xF196, 0xE943, 0xE787,
-    0xEC48, 0xE9F5, 0xECC6, 0xE9F3, 0xE9CA, 0xE945,
-    0xE7B8, 0xEC4A, 0xE916, 0xE83E, 0xE7F8, 0xEC49, 0xF0E2,
+    0xE8EF, 0xF196, 0xECCE, 0xE787,
+    0xEB0D, 0xF1AA, 0xECC6, 0xF4C1, 0xE7A3, 0xECAD,
+    0xE809, 0xEADA, 0xE917, 0xE945, 0xF20F, 0xEC4A, 0xF515,
     0xE713,
 ];
 
@@ -78,8 +78,11 @@ fn set_mode(m: i64) {
 fn top_bar(ctx: ui::Context, w: f32, history_button: bool) {
     let title = MODE_NAMES[mode];
     let tw = ui::text_width(th::f_title, title) + 16.0;
+    // HamburgerHeight = 48 in App.xaml
+    ui::layout_row_dynamic(ctx, 4.0, 1);
+    ui::spacer(ctx);
     ui::layout_row_begin(ctx, ui::STATIC, 40.0, 4);
-    ui::layout_row_push(ctx, 40.0);
+    ui::layout_row_push(ctx, 46.0);
     if th::icon_key(ctx, 0xE700, th::K_FLAT) {
         nav_open = !nav_open;
         // Derselbe Klick darf das Menü nicht gleich wieder schließen: Nuklear
@@ -88,13 +91,13 @@ fn top_bar(ctx: ui::Context, w: f32, history_button: bool) {
     }
     ui::layout_row_push(ctx, tw);
     th::text(ctx, title, th::f_title, th::pal.text, ui::TEXT_LEFT);
-    let rest = w - 8.0 - 40.0 - tw - 40.0 - 6.0;
+    let rest = w - 6.0 - 46.0 - tw - 46.0 - 6.0 - 6.0;
     ui::layout_row_push(ctx, max(rest, 0.0));
     ui::spacer(ctx);
-    ui::layout_row_push(ctx, 40.0);
+    ui::layout_row_push(ctx, 46.0);
     if history_button {
         let sel = cv::flyout == cv::PANEL_HISTORY;
-        if th::icon_key(ctx, 0xE81C, if sel { th::K_FLAT_SEL } else { th::K_FLAT }) {
+        if th::key(ctx, "", if sel { th::K_FLAT_SEL } else { th::K_FLAT }, th::f_calc) {
             cv::flyout = if sel { 0 } else { cv::PANEL_HISTORY };
         }
     } else {
@@ -105,49 +108,73 @@ fn top_bar(ctx: ui::Context, w: f32, history_button: bool) {
 
 // --- Navigation --------------------------------------------------------------------------
 
+// Wie bei Windows 11: ein schwebendes Panel mit runden Ecken über dem
+// Rechner, ohne Abdunkelung; ein Klick daneben schließt es.
+let NAV_X = 6.0;
+let NAV_W = 256.0;
+
 fn nav(ctx: ui::Context, w: f32, h: f32) {
     let fresh = nav_fresh;
     nav_fresh = false;
     let saved = ui::style(ctx);
     var st = saved;
-    st.window.fixed_background = ui::style_item_color(ui::rgba(0, 0, 0, if th::dark { 110 } else { 60 }));
-    st.window.padding = float2 { 4.0, 4.0 };
+    st.window.fixed_background = ui::style_item_hide();
+    st.window.padding = float2 { NAV_X + 4.0, 4.0 };
+    st.window.spacing = float2 { 0.0, 0.0 };
+    st.window.group_padding = float2 { 0.0, 0.0 };
+    st.window.scrollbar_size = float2 { 2.0, 2.0 };
+    st.scrollv.cursor_normal = ui::style_item_color(th::pal.text_off);
     ui::set_style(ctx, st);
-    let pw = min(256.0, w);
+    let pw = min(NAV_W, w - NAV_X * 2.0);
+    let inner = pw - 8.0;
     if ui::begin(ctx, "nav", ui::rect(0, 0, w, h), ui::WINDOW_NO_SCROLLBAR) {
-        ui::fill_rect(ctx, ui::rect(0, 0, pw, h), 0.0, th::pal.pane);
-        ui::stroke_line(ctx, pw, 0.0, pw, h, 1.0, th::pal.line);
-        ui::layout_row_begin(ctx, ui::STATIC, 40.0, 1);
+        let panel = ui::rect(NAV_X, 2.0, pw, h - 2.0 - NAV_X);
+        ui::fill_rect(ctx, panel, 8.0, th::pal.pane);
+        ui::stroke_rect(ctx, panel, 8.0, 1.0, th::pal.line);
+        ui::layout_row_static(ctx, 4.0, 1, 1);
+        ui::spacer(ctx);
+        ui::layout_row_begin(ctx, ui::STATIC, 32.0, 1);
         ui::layout_row_push(ctx, 40.0);
-        if th::icon_key(ctx, 0xE700, th::K_FLAT) && !fresh { nav_open = false; }
+        if th::key(ctx, th::icon_text(0xE700), th::K_NAV_SEL, th::f_icon) && !fresh { nav_open = false; }
         ui::layout_row_end(ctx);
-        ui::layout_row_static(ctx, h - 92.0, (pw - 8.0) as! i64, 1);
+        let list_h = h - NAV_X - 4.0 - 32.0 - 10.0 - 1.0 - 44.0 - 4.0;
+        ui::layout_row_static(ctx, list_h, inner as! i64, 1);
         if ui::group_begin(ctx, "navliste", 0) {
-            header(ctx, "Rechner", pw);
-            for m in M_STANDARD..M_CURRENCY { nav_row(ctx, m, pw); }
-            header(ctx, "Konverter", pw);
-            for m in M_CURRENCY..M_SETTINGS { nav_row(ctx, m, pw); }
+            header(ctx, "Rechner", inner);
+            for m in M_STANDARD..M_CURRENCY { nav_row(ctx, m, inner); }
+            header(ctx, "Konverter", inner);
+            for m in M_CURRENCY..M_SETTINGS { nav_row(ctx, m, inner); }
             ui::group_end(ctx);
         }
-        ui::layout_row_static(ctx, 1.0, (pw - 8.0) as! i64, 1);
+        ui::layout_row_static(ctx, 5.0, 1, 1);
+        ui::spacer(ctx);
+        // Trennlinie über "Einstellungen", über die ganze Breite des Panels.
+        ui::layout_row_static(ctx, 1.0, inner as! i64, 1);
         let st1, r1 = ui::widget(ctx);
-        if st1 != ui::WIDGET_INVALID { ui::fill_rect(ctx, r1, 0.0, th::pal.line); }
-        nav_row(ctx, M_SETTINGS, pw);
+        if st1 != ui::WIDGET_INVALID {
+            ui::fill_rect(ctx, ui::rect(NAV_X + 1.0, r1.y, pw - 2.0, 1.0), 0.0, th::pal.line);
+        }
+        ui::layout_row_static(ctx, 4.0, 1, 1);
+        ui::spacer(ctx);
+        nav_row(ctx, M_SETTINGS, inner);
     }
     ui::end(ctx);
     ui::set_style(ctx, saved);
-    // Ein Klick neben die Leiste schließt sie.
     let m = gfx::mouse_pos();
-    if !fresh && gfx::mouse_pressed(gfx::MOUSE_LEFT) && m.x / dpi > pw { nav_open = false; }
+    let inside = m.x / dpi >= NAV_X && m.x / dpi <= NAV_X + pw;
+    if !fresh && gfx::mouse_pressed(gfx::MOUSE_LEFT) && !inside { nav_open = false; }
 }
 
-fn header(ctx: ui::Context, s: const u8[:], pw: f32) {
-    ui::layout_row_static(ctx, 34.0, (pw - 16.0) as! i64, 1);
-    th::text(ctx, str("    ", s), th::f_small, th::pal.text, ui::TEXT_LEFT);
+fn header(ctx: ui::Context, s: const u8[:], inner: f32) {
+    ui::layout_row_static(ctx, 40.0, inner as! i64, 1);
+    let st, r = ui::widget(ctx);
+    if st != ui::WIDGET_INVALID {
+        kit::text_left(ctx, ui::rect(r.x + 12.0, r.y + 4.0, r.w - 12.0, r.h - 4.0), s, th::f_head, th::pal.text);
+    }
 }
 
-fn nav_row(ctx: ui::Context, m: i64, pw: f32) {
-    ui::layout_row_static(ctx, 38.0, (pw - 16.0) as! i64, 1);
+fn nav_row(ctx: ui::Context, m: i64, inner: f32) {
+    ui::layout_row_static(ctx, 40.0, inner as! i64, 1);
     if kit::nav_item(ctx, MODE_ICONS[m], MODE_NAMES[m], m == mode) {
         set_mode(m);
         nav_open = false;
@@ -172,8 +199,12 @@ fn settings(ctx: ui::Context, w: f32) {
     ui::layout_row_dynamic(ctx, 20.0, 1);
     th::text(ctx, "  Rechner, geschrieben in Goose", th::f_text, th::pal.text, ui::TEXT_LEFT);
     ui::layout_row_dynamic(ctx, 20.0, 1);
-    th::text(ctx, "  Wechselkurse: frankfurter.dev (Referenzkurse der EZB)", th::f_text,
-             th::pal.text_dim, ui::TEXT_LEFT);
+    th::text(ctx, "  Wechselkurse: frankfurter.dev", th::f_text, th::pal.text_dim, ui::TEXT_LEFT);
+    ui::layout_row_dynamic(ctx, 20.0, 1);
+    th::text(ctx, "  (Referenzkurse der EZB)", th::f_text, th::pal.text_dim, ui::TEXT_LEFT);
+    ui::layout_row_dynamic(ctx, 20.0, 1);
+    th::text(ctx, "  Design und Symbole: microsoft/calculator (MIT)", th::f_text, th::pal.text_dim,
+             ui::TEXT_LEFT);
 }
 
 // --- Tastatur ----------------------------------------------------------------------------------
@@ -225,8 +256,8 @@ fn main() {
     var shot: u8[>..] = [];
     var keys: u8[>..] = [];
     var clicks: u8[>..] = [];       // "x,y;x,y": je ein Klick ab Bild 2, alle 3 Bilder
-    var win_w = 336;
-    var win_h = 560;
+    var win_w = 336;  // wie das Windows-Fenster ohne Titelleiste
+    var win_h = 509;
     let argv = args();
     var i = 1;
     while i + 1 < argv.len {
@@ -305,13 +336,15 @@ fn main() {
         let sz = gfx::screen_size();
         let w = sz.x / dpi;
         let h = sz.y / dpi;
-        let wide = is_calc(mode) && w >= 600.0;
-        let main_w = if wide { w - 320.0 } else { w };
+        // DockVisible in Calculator.xaml: ab 560 px Verlauf/Speicher daneben,
+        // Spalten im Verhältnis 320 : 240.
+        let wide = is_calc(mode) && w >= 560.0;
+        let main_w = if wide { floor(w * 320.0 / 560.0) } else { w };
         if !wide && cv::flyout == 0 {}
 
         if ui::begin(ctx, "main", ui::rect(0, 0, main_w, h), ui::WINDOW_NO_SCROLLBAR | ui::WINDOW_BACKGROUND) {
             top_bar(ctx, main_w, is_calc(mode) && !wide);
-            let used = 42.0 + 2.0;
+            let used = 48.0;
             if is_calc(mode) { cv::draw(ctx, main_w, h, used, !wide, mode == M_SCI); }
             else if mode == M_PROG { pv::draw(ctx, main_w, h, used); }
             else if mode == M_DATE { dv::draw(ctx, main_w, h, used); }
@@ -321,7 +354,7 @@ fn main() {
         ui::end(ctx);
         if wide {
             if cv::flyout != 0 { cv::flyout = 0; }
-            if ui::begin(ctx, "seite", ui::rect(main_w, 0, 320.0, h), ui::WINDOW_NO_SCROLLBAR | ui::WINDOW_BACKGROUND) {
+            if ui::begin(ctx, "seite", ui::rect(main_w, 0, w - main_w, h), ui::WINDOW_NO_SCROLLBAR | ui::WINDOW_BACKGROUND) {
                 cv::side_panel(ctx, h);
             }
             ui::end(ctx);

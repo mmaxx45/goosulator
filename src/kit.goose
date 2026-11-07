@@ -57,18 +57,21 @@ fn two_line_item(ctx: ui::Context, top: const u8[:], bottom: const u8[:], h: f32
     hot && clicked(ctx, r)
 }
 
-// Ein Eintrag der Navigation: Symbol, Name, beim gewählten ein Balken links.
+// Ein Eintrag der Navigation: Symbol, Name, der gewählte heller hinterlegt
+// und mit Akzentbalken links, wie bei Windows 11.
 fn nav_item(ctx: ui::Context, icon: u32, name: const u8[:], selected: bool) -> bool {
-    let state, r = ui::widget(ctx);
+    let state, r0 = ui::widget(ctx);
     if state == ui::WIDGET_INVALID { return false; }
+    let r = ui::rect(r0.x, r0.y + 2.0, r0.w - 4.0, r0.h - 4.0);
     let hot = state == ui::WIDGET_VALID && hovered(ctx, r);
-    if selected || hot { ui::fill_rect(ctx, r, 4.0, th::pal.flat_hover); }
+    if selected { ui::fill_rect(ctx, r, 4.0, th::pal.nav_sel); }
+    else if hot { ui::fill_rect(ctx, r, 4.0, th::pal.nav_hover); }
     if selected {
         ui::fill_rect(ctx, ui::rect(r.x, r.y + r.h * 0.5 - 8.0, 3.0, 16.0), 1.5, th::pal.bar);
     }
     if icon != 0 {
         let t = th::icon_text(icon);
-        text_center(ctx, ui::rect(r.x + 4.0, r.y, 32.0, r.h), t, th::f_icon, th::pal.text);
+        text_center(ctx, ui::rect(r.x + 8.0, r.y, 28.0, r.h), t, th::f_calc, th::pal.text);
     }
     text_left(ctx, ui::rect(r.x + 44.0, r.y, r.w - 48.0, r.h), name, th::f_text, th::pal.text);
     hot && clicked(ctx, r)
@@ -79,8 +82,8 @@ fn tab(ctx: ui::Context, name: const u8[:], selected: bool) -> bool {
     let state, r = ui::widget(ctx);
     if state == ui::WIDGET_INVALID { return false; }
     let hot = state == ui::WIDGET_VALID && hovered(ctx, r);
-    let w = ui::text_width(th::f_text, name);
-    let font = if selected { th::f_small } else { th::f_text };
+    let font = if selected { th::f_head } else { th::f_text };
+    let w = ui::text_width(font, name);
     text_center(ctx, r, name, font, if selected || hot { th::pal.text } else { th::pal.text_dim });
     if selected {
         ui::fill_rect(ctx, ui::rect(r.x + (r.w - w) * 0.5, r.y + r.h - 3.0, w, 3.0), 1.5, th::pal.bar);

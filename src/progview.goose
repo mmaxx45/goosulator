@@ -617,7 +617,7 @@ fn draw(ctx: ui::Context, w: f32, h: f32, used: f32) {
     let st2, r2 = ui::widget(ctx);
     if st2 != ui::WIDGET_INVALID {
         kit::text_right(ctx, ui::rect(r2.x + 8.0, r2.y, r2.w - 16.0, r2.h), d,
-                        th::fit_font(d, r2.w - 16.0), th::pal.text);
+                        th::fit_font_h(d, r2.w - 16.0, 40.0), th::pal.text);
     }
     radix_row(ctx, "HEX", 16);
     radix_row(ctx, "DEC", 10);
